@@ -40,17 +40,29 @@ __toolversion = $(shell $(GIT_ROOT)/scripts/toolversion $(1))
 # Main targets
 
 clean: ##@prepare Remove all output folders
-	git clean -dxf -f -e android/local.properties
+	git clean -dxf -f
 
 setup: ##@prepare Install all the requirements for status-react
 	@./scripts/setup
-	@./scripts/run-environment-check.sh setup
+
+shell: ##@prepare Enter into a preconfigured shell
+ifndef IN_NIX_SHELL
+	@echo "Configuring Nix shell..."
+	@nix-shell
+else
+	@echo "Nix shell is already active"
+endif
 
 prepare-desktop: ##@prepare Install desktop platform dependencies and prepare workspace
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	scripts/prepare-for-platform.sh desktop
 	yarn install --frozen-lockfile
+endif
 
 $(STATUS_GO_IOS_ARCH):
+	@echo "Downloading status-go artifact from DigitalOcean Bucket"; \
 	curl --fail --silent --location \
 		"${DO_SPACE_URL}/status-go-ios-$(STATUS_GO_VER).zip" \
 		--output "$(STATUS_GO_IOS_ARCH)"; \
@@ -71,6 +83,7 @@ $(STATUS_GO_IOS_ARCH):
 
 $(STATUS_GO_DRO_ARCH):
 	mkdir -p $(ANDROID_LIBS_DIR)
+	@echo "Downloading status-go artifact from DigitalOcean Bucket"; \
 	curl --fail --silent --location \
 		"${DO_SPACE_URL}/status-go-android-$(STATUS_GO_VER).aar" \
 		--output "$(STATUS_GO_DRO_ARCH)"; \
@@ -85,17 +98,25 @@ $(STATUS_GO_DRO_ARCH):
 	fi
 
 prepare-ios: $(STATUS_GO_IOS_ARCH) ##@prepare Install and prepare iOS-specific dependencies
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	scripts/prepare-for-platform.sh ios
 	yarn install --frozen-lockfile
 	unzip -q -o "$(STATUS_GO_IOS_ARCH)" -d "$(RCTSTATUS_DIR)"
 ifeq ($(OS),Darwin)
 	cd ios && pod install
 endif
+endif
 
 prepare-android: $(STATUS_GO_DRO_ARCH) ##@prepare Install and prepare Android-specific dependencies
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	scripts/prepare-for-platform.sh android
 	yarn install --frozen-lockfile
 	cd android && ./gradlew react-native-android:installArchives
+endif
 
 prepare-mobile: prepare-android prepare-ios ##@prepare Install and prepare mobile platform specific dependencies
 
@@ -105,66 +126,94 @@ prepare-mobile: prepare-android prepare-ios ##@prepare Install and prepare mobil
 release: release-android release-ios ##@build build release for Android and iOS
 
 release-android: prod-build-android ##@build build release for Android
+ifdef IN_NIX_SHELL
 	react-native run-android --variant=release
+endif
 
 release-ios: prod-build-ios ##@build build release for iOS release
+ifdef IN_NIX_SHELL
 	@echo "Build in XCode, see https://status.im/build_status/ for instructions"
+endif
 
 release-desktop: prod-build-desktop ##@build build release for desktop release
+ifdef IN_NIX_SHELL
 	scripts/build-desktop.sh
+endif
 
 release-windows-desktop: prod-build-desktop ##@build build release for desktop release
+ifdef IN_NIX_SHELL
 	TARGET_SYSTEM_NAME=Windows scripts/build-desktop.sh
+endif
 
 prod-build:
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	scripts/run-environment-check.sh android
 	scripts/run-environment-check.sh ios
 	lein prod-build
+endif
 
 prod-build-android:
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	rm ./modules/react-native-status/android/libs/status-im/status-go/local/status-go-local.aar 2> /dev/null || true
 	scripts/run-environment-check.sh android
 	lein prod-build-android
+endif
 
 prod-build-ios:
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	rm -r ./modules/react-native-status/ios/RCTStatus/Statusgo.framework/ 2> /dev/null || true
 	scripts/run-environment-check.sh ios
 	lein prod-build-ios
+endif
 
 full-prod-build: ##@build build prod for both Android and iOS
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	./scripts/bundle-status-go.sh ios android
 	$(MAKE) prod-build
 	rm -r ./modules/react-native-status/ios/RCTStatus/Statusgo.framework/ 2> /dev/null || true
 	rm ./modules/react-native-status/android/libs/status-im/status-go/local/status-go-local.aar 2> /dev/null
+endif
 
 prod-build-desktop:
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	git clean -qdxf -f ./index.desktop.js desktop/
 	scripts/run-environment-check.sh desktop
 	lein prod-build-desktop
+endif
 
 #--------------
 # REPL
 # -------------
 
-watch-ios-real: ##@watch Start development for iOS real device
-	scripts/run-environment-check.sh ios
-	clj -R:dev build.clj watch --platform ios --ios-device real
+_watch-%: ##@watch Start development for device
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
+	$(eval SYSTEM := $(word 2, $(subst -, , $@)))
+	$(eval DEVICE := $(word 3, $(subst -, , $@)))
+	scripts/run-environment-check.sh $(SYSTEM)
+	clj -R:dev build.clj watch --platform $(SYSTEM) --$(SYSTEM)-device $(DEVICE)
+endif
 
-watch-ios-simulator: ##@watch Start development for iOS simulator
-	scripts/run-environment-check.sh ios
-	clj -R:dev build.clj watch --platform ios --ios-device simulator
+watch-ios-real: _watch-ios-real ##@watch Start development for iOS real device
 
-watch-android-real: ##@watch Start development for Android real device
-	scripts/run-environment-check.sh android
-	clj -R:dev build.clj watch --platform android --android-device real
+watch-ios-simulator: _watch-ios-simulator ##@watch Start development for iOS simulator
 
-watch-android-avd: ##@watch Start development for Android AVD
-	scripts/run-environment-check.sh android
-	clj -R:dev build.clj watch --platform android --android-device avd
+watch-android-real: _watch-android-real ##@watch Start development for Android real device
 
-watch-android-genymotion: ##@watch Start development for Android Genymotion
-	scripts/run-environment-check.sh android
-	clj -R:dev build.clj watch --platform android --android-device genymotion
+watch-android-avd: _watch-android-avd ##@watch Start development for Android AVD
+
+watch-android-genymotion: _watch-android-genymotion ##@watch Start development for Android Genymotion
 
 watch-desktop: ##@watch Start development for Desktop
 	scripts/run-environment-check.sh desktop
@@ -173,21 +222,30 @@ watch-desktop: ##@watch Start development for Desktop
 #--------------
 # Run
 # -------------
-run-android: ##@run Run Android build
-	scripts/run-environment-check.sh android
-	react-native run-android --appIdSuffix debug
+_run-%:
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
+	$(eval SYSTEM := $(word 2, $(subst -, , $@)))
+	scripts/run-environment-check.sh $(SYSTEM)
+	react-native run-$(SYSTEM)
+endif
 
-run-desktop: ##@run Run Desktop build
-	scripts/run-environment-check.sh desktop
-	react-native run-desktop
+run-android: _run-android ##@run Run Android build
+
+run-desktop: _run-desktop ##@run Run Desktop build
 
 SIMULATOR=
 run-ios: ##@run Run iOS build
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	scripts/run-environment-check.sh ios
 ifneq ("$(SIMULATOR)", "")
 	react-native run-ios --simulator="$(SIMULATOR)"
 else
 	react-native run-ios
+endif
 endif
 
 #--------------
@@ -195,29 +253,53 @@ endif
 #--------------
 
 test: ##@test Run tests once in NodeJS
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	lein with-profile test doo node test once
+endif
 
 test-auto: ##@test Run tests in interactive (auto) mode in NodeJS
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	lein with-profile test doo node test
+endif
 
 #--------------
 # Other
 #--------------
 react-native: ##@other Start react native packager
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	@scripts/start-react-native.sh
+endif
 
 geth-connect: ##@other Connect to Geth on the device
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	adb forward tcp:8545 tcp:8545
 	build/bin/geth attach http://localhost:8545
+endif
 
 android-ports: ##@other Add proxies to Android Device/Simulator
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	adb reverse tcp:8081 tcp:8081
 	adb reverse tcp:3449 tcp:3449
 	adb reverse tcp:4567 tcp:4567
 	adb forward tcp:5561 tcp:5561
+endif
 
 android-logcat:
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	adb logcat | grep -e StatusModule -e ReactNativeJS -e StatusNativeLogs
+endif
 
 _list:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'
@@ -228,14 +310,18 @@ _unknown-startdev-target-%:
 	@ exit 1
 
 _startdev-%:
+ifndef IN_NIX_SHELL
+	@echo "Please run '$(MAKE) shell' first"
+else
 	$(eval SYSTEM := $(word 2, $(subst -, , $@)))
 	$(eval DEVICE := $(word 3, $(subst -, , $@)))
-	${MAKE} prepare-${SYSTEM} || ${MAKE} _unknown-startdev-target-$@
+	$(MAKE) prepare-${SYSTEM} || $(MAKE) _unknown-startdev-target-$@
 	@ if [ -z "$(DEVICE)" ]; then \
-		${MAKE} watch-$(SYSTEM) || ${MAKE} _unknown-startdev-target-$@; \
+		$(MAKE) watch-$(SYSTEM) || $(MAKE) _unknown-startdev-target-$@; \
 	else \
-		${MAKE} watch-$(SYSTEM)-$(DEVICE) || ${MAKE} _unknown-startdev-target-$@; \
+		$(MAKE) watch-$(SYSTEM)-$(DEVICE) || $(MAKE) _unknown-startdev-target-$@; \
 	fi
+endif
 
 startdev-android-avd: _startdev-android-avd
 startdev-android-genymotion: _startdev-android-genymotion
