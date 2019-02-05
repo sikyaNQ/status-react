@@ -95,9 +95,11 @@ pipeline {
       } }
     }
     stage('Publish') {
-      when { expression { btype == 'nightly' } }
       steps { script {
-        build('misc/status.im')
+        switch (btype) {
+          case 'nightly': build('misc/status.im'); break
+          case 'release': cmn.gh.publishReleaseMobile(); break
+        }
       } }
     }
     stage('Run e2e') {
