@@ -2,7 +2,10 @@
   (:require-macros [status-im.utils.views :as views])
   (:require [re-frame.core :as re-frame]
             [status-im.ui.components.list.views :as list]
+            [status-im.ui.components.list-item.views :as list-item]
             [status-im.ui.components.react :as react]
+            [reagent.core :as reagent]
+            [status-im.ui.components.animation :as animation]
             [status-im.ui.components.toolbar.view :as toolbar]
             [status-im.ui.components.toolbar.actions :as toolbar.actions]
             [status-im.ui.components.connectivity.view :as connectivity]
@@ -11,6 +14,7 @@
             [status-im.ui.screens.home.styles :as styles]
             [status-im.utils.platform :as platform]
             [status-im.react-native.resources :as resources]
+            [status-im.i18n :as i18n]
             [status-im.ui.components.common.common :as components.common]
             [status-im.ui.components.icons.vector-icons :as icons]
             [status-im.utils.datetime :as time]
@@ -87,15 +91,154 @@
       [react/i18n-text {:style styles/welcome-text-description
                         :key   :welcome-to-status-description}]]]))
 
-(views/defview chats-list []
-  (views/letsubs [home-items [:home-items]]
-    (if (empty? home-items)
-      [react/view styles/no-chats
-       [react/i18n-text {:style styles/no-chats-text :key :no-recent-chats}]]
-      [list/flat-list {:data      home-items
-                       :key-fn    first
-                       :render-fn (fn [home-item]
-                                    [home-list-item home-item])}])))
+(def search-input-height 56)
+
+(defn search-input
+  [search-filter {:keys [on-cancel on-focus on-change]}]
+  (let [input-is-focused? (reagent/atom false)
+        input-ref (reagent/atom nil)]
+    (fn [search-filter]
+      (let [show-cancel? (or @input-is-focused?
+                             (not-empty search-filter))]
+        [react/view {:style {:height             search-input-height
+                             :flex-direction     :row
+                             :padding-horizontal 16
+                             :background-color   colors/white
+                             :align-items        :center
+                             :justify-content    :center}}
+         [react/view {:style {:background-color colors/gray-lighter
+                              :flex             1
+                              :flex-direction   :row
+                              :height           36
+                              :align-items      :center
+                              :justify-content  :center
+                              :border-radius    8}}
+          [icons/icon :main-icons/search {:color           colors/gray
+                                          :container-style {:margin-left  6
+                                                            :margin-right 2}}]
+          [react/text-input {:placeholder     (i18n/label :t/search)
+                             :blur-on-submit  true
+                             :multiline       false
+                             :number-of-lines 1
+                             :ref             #(reset! input-ref %)
+                             :style           {:flex        1
+                                               :margin      0
+                                               :padding     0
+                                               :line-height 22
+                                               :font-size   15}
+                             :default-value   search-filter
+                             :on-focus
+                             #(do
+                                (when on-focus
+                                  (on-focus))
+                                (reset! input-is-focused? true))
+                             :on-change
+                             (fn [e]
+                               (let [native-event (.-nativeEvent e)
+                                     text         (.-text native-event)]
+                                 (when on-change
+                                   (on-change text))))}]]
+         (when show-cancel?
+           [react/touchable-highlight
+            {:on-press #(do
+                          (when on-cancel
+                            (on-cancel))
+                          (.blur @input-ref)
+                          (reset! input-is-focused? false))
+             :style {:margin-left 16}}
+            [react/text {:style {:color     colors/blue
+                                 :font-size 15}}
+             (i18n/label :t/cancel)]])]))))
+
+(defn home-empty-view []
+  [react/view styles/no-chats
+   [react/i18n-text {:style styles/no-chats-text :key :no-recent-chats}]])
+
+(defn home-filtered-items-list [chats browsers]
+  [list/section-list
+   {:sections [{:title :t/chats
+                :data chats}
+               {:title :t/browsers
+                :data browsers}
+               {:title :t/messages
+                :data []}]
+    :key-fn first
+    :render-section-header-fn (fn [{:keys [title data]}]
+                                [react/text {:style {:font-size   15
+                                                     :margin-left 16
+                                                     :margin-top  16
+                                                     :color       colors/gray}}
+                                 (i18n/label title)])
+    :render-section-footer-fn (fn [{:keys [title data]}]
+                                (when (empty? data)
+                                  [list/big-list-item {:text          (i18n/label (if (= title "messages")
+                                                                                    :t/messages-search-coming-soon
+                                                                                    :t/no-result))
+                                                       :text-color    colors/gray
+                                                       :hide-chevron? true
+                                                       :action-fn     #()
+                                                       :icon          (case title
+                                                                        "messages" :main-icons/private-chat
+                                                                        "browsers" :main-icons/browser
+                                                                        "chats"    :main-icons/message)
+                                                       :icon-color    colors/gray}]))
+    :render-fn (fn [home-item]
+                 [home-list-item home-item])}])
+
+(defn hide-search-input
+  [anim-search-input-height]
+  (animation/start
+   (animation/timing anim-search-input-height
+                     {:toValue  0
+                      :duration 350
+                      :easing   (.in (animation/easing)
+                                     (.-quad (animation/easing)))})))
+
+(defn show-search-input
+  [anim-search-input-height]
+  (animation/start
+   (animation/timing anim-search-input-height
+                     {:toValue  search-input-height
+                      :duration 350
+                      :easing   (.out (animation/easing)
+                                      (.-quad (animation/easing)))})))
+
+(defn home-items-view
+  [search-filter {:keys [chats browsers all-home-items] :as home-items}]
+  (let [scrolling-from-top? (reagent/atom false)
+        anim-search-input-height (animation/create-value 0)]
+    (fn [search-filter {:keys [chats browsers all-home-items] :as home-items}]
+      (if home-items
+        [react/view
+         [react/animated-view {:style {:height anim-search-input-height}}
+          [search-input search-filter {:on-cancel #(do
+                                                     (re-frame/dispatch [:search/filter-changed nil])
+                                                     (hide-search-input anim-search-input-height))
+                                       :on-focus  #(when-not search-filter
+                                                     (re-frame/dispatch [:search/filter-changed ""]))
+                                       :on-change (fn [text]
+                                                    (re-frame/dispatch [:search/filter-changed text]))}]]
+         (case search-filter
+           nil [list/flat-list {:data   all-home-items
+                                :key-fn first
+                                :on-scroll-begin-drag
+                                (fn [e]
+                                  (when (and
+                                         (not @scrolling-from-top?)
+                                         (zero? (.-y (.-contentOffset (.-nativeEvent e)))))
+                                    (reset! scrolling-from-top? true)))
+                                :on-scroll-end-drag
+                                (fn [e]
+                                  (when (and @scrolling-from-top?
+                                             (zero? (.-y (.-contentOffset (.-nativeEvent e)))))
+                                    (reset! scrolling-from-top? false)
+                                    (show-search-input anim-search-input-height)))
+                                :render-fn
+                                (fn [home-item]
+                                  [home-list-item home-item])}]
+           "" nil
+           [home-filtered-items-list chats browsers])]
+        [home-empty-view]))))
 
 (views/defview home [loading?]
   (views/letsubs [show-welcome? [:get-in [:accounts/create :show-welcome?]]
@@ -104,7 +247,9 @@
                   sync-state [:chain-sync-state]
                   latest-block-number [:latest-block-number]
                   rpc-network? [:current-network-uses-rpc?]
-                  network-initialized? [:current-network-initialized?]]
+                  network-initialized? [:current-network-initialized?]
+                  search-filter [:search/filter]
+                  home-items [:home-items]]
     {:component-did-mount
      (fn [this]
        (let [[_ loading?] (.. this -props -argv)]
@@ -113,7 +258,8 @@
             #(re-frame/dispatch [:init-rest-of-chats])
             100))))}
     [react/view styles/container
-     [toolbar show-welcome? (and network-initialized? (not rpc-network?)) sync-state latest-block-number (not logging-in?)]
+     [toolbar show-welcome? (and network-initialized? (not rpc-network?))
+      sync-state latest-block-number (not logging-in?)]
      (cond show-welcome?
            [welcome view-id]
            loading?
@@ -126,7 +272,7 @@
            :else
            [react/view {:style {:flex 1}}
             [connectivity/connectivity-view]
-            [chats-list]])
+            [home-items-view search-filter home-items]])
      (when platform/android?
        [home-action-button (not logging-in?)])]))
 
