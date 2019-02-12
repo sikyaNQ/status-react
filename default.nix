@@ -1,22 +1,30 @@
-with import (builtins.fetchTarball {
-  # Descriptive name to make the store path easier to identify
-  name = "nixos-unstable-2019-02-12";
-  # Commit hash for nixos-unstable as of 2019-02-12 (obtained at https://howoldis.herokuapp.com/ from channel 'nixos-18.09')
-  url = https://github.com/nixos/nixpkgs/archive/168cbb39691cca2822ce1fdb3e8c0183af5c6d0d.tar.gz;
-  # Hash obtained using `nix-prefetch-url --unpack <url>`
-  sha256 = "0fqasswfqrz2rbag9bz17j8y7615s0p9l23cw4sk2f384gk0zf6c";
-}) {};
-stdenv.mkDerivation rec {
+let
+  pkgs = import (builtins.fetchTarball {
+    # Descriptive name to make the store path easier to identify
+    name = "nixos-unstable-2019-02-12";
+    # Commit hash for nixos-unstable as of 2019-02-12 (obtained at https://howoldis.herokuapp.com/ from channel 'nixos-18.09')
+    url = https://github.com/nixos/nixpkgs/archive/168cbb39691cca2822ce1fdb3e8c0183af5c6d0d.tar.gz;
+    # Hash obtained using `nix-prefetch-url --unpack <url>`
+    sha256 = "0fqasswfqrz2rbag9bz17j8y7615s0p9l23cw4sk2f384gk0zf6c";
+  }) {};
+  nodejs = pkgs."nodejs-10_x";
+  nodeInputs = import ./scripts/lib/setup/nix/global-node-packages/output {
+    # The remaining dependencies come from Nixpkgs
+    inherit pkgs;
+    inherit nodejs;
+  };
+  nodePkgs = (map (x: nodeInputs."${x}") (builtins.attrNames nodeInputs));
+in pkgs.stdenv.mkDerivation rec {
   name = "env";
-  env = buildEnv { name = name; paths = buildInputs; };
-  buildInputs = [
+  env = pkgs.buildEnv { name = name; paths = buildInputs; };
+  buildInputs = with pkgs; [
     cmake
     extra-cmake-modules
     clojure
     go_1_10
     leiningen
     maven
-    nodejs-10_x
+    nodejs
     openjdk
     python27 # for e.g. gyp
     # qt511.full # does not install on macOS due to incompatible dependency `bluez`
@@ -39,7 +47,7 @@ stdenv.mkDerivation rec {
     wget
     yarn
   # ] ++ stdenv.lib.optional stdenv.isLinux conan; # Causing build errors in pylint when fetching 168cbb39691cca2822ce1fdb3e8c0183af5c6d0d, supposedly fixed in https://github.com/NixOS/nixpkgs/issues/51394
-  ] ++ stdenv.lib.optional stdenv.isLinux python37; # for Conan
+  ] ++ nodePkgs ++ stdenv.lib.optional stdenv.isLinux python37; # for Conan
   shellHook = with pkgs; ''
       local toolversion="$(git rev-parse --show-toplevel)/scripts/toolversion"
 

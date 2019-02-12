@@ -61,24 +61,6 @@ function install_android_sdk() {
   return 0
 }
 
-function install_react_native_cli() {
-  cd "$(repo_path)"
-
-  local npm_command='npm'
-  local required_version=$(toolversion react_native_cli)
-
-  if is_linux; then
-    # aptitude version of node requires sudo for global install
-    npm_command="sudo $npm_command"
-  fi
-
-  if npm list "react-native-cli@{required_version}" &>/dev/null; then
-    already_installed "react-native-cli@{required_version}"
-  else
-    $npm_command install --no-save react-native-cli@${required_version}
-  fi
-}
-
 function required_pod_version() {
   cat "$(repo_path)/ios/Podfile.lock" | grep "COCOAPODS: " | awk '{ print $2 }'
 }
