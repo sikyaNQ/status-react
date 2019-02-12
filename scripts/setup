@@ -51,7 +51,6 @@ fi
 setup_header "Installing requirements..."
 
 install_nix && \
-install_react_native_cli && \
 install_nsis && \
 install_android_sdk && \
 install_android_ndk || \
