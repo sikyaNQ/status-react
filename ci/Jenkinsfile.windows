@@ -4,7 +4,7 @@ pipeline {
     docker {
       label 'linux-new'
       /* WARNING: remember to keep this up-to-date with the value in docker/windows/Makefile */
-      image 'statusteam/status-build-windows:1.1.0-fb116054'
+      image 'statusteam/status-build-windows:1.1.0-6ec09ec0'
       args (
         "--privileged "+
         "-v /dev/fuse:/dev/fuse "+
@@ -52,6 +52,7 @@ pipeline {
     CONAN_SYSREQUIRES_SUDO = '0'
     STATUSIM_WINDOWS_BASEIMAGE_ZIP = '/opt/StatusIm-Windows-base-image.zip'
     VERBOSE_LEVEL = '3'
+    IN_NIX_SHELL = "not really, but we need this until we bring Nix to Jenkins builds"
   }
 
   stages {
