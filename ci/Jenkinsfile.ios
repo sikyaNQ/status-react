@@ -29,6 +29,7 @@ pipeline {
     FASTLANE_DISABLE_COLORS=1
     REALM_DISABLE_ANALYTICS=1
     BUNDLE_PATH = "${HOME}/.bundle"
+    IN_NIX_SHELL = "not really, but we need this until we bring Nix to Jenkins builds"
   }
 
   stages {
