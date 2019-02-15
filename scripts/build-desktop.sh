@@ -90,13 +90,6 @@ function init() {
     exit 1
   fi
 
-  if ! is_windows_target; then
-    if [ -z $QT_PATH ]; then
-      echo "${RED}QT_PATH environment variable is not defined!${NC}"
-      exit 1
-    fi
-  fi
-
   if is_macos; then
     if [ -z $MACDEPLOYQT ]; then
       set +e
@@ -112,15 +105,16 @@ function init() {
   elif is_linux; then
     rm -rf ./desktop/toolchain/
     # TODO: Use Conan for Linux and MacOS builds too
+    export PATH=$STATUSREACTPATH:$PATH
+    if ! program_exists 'conan'; then
+      echo "${RED}Conan package manager not found. Exiting...${NC}"
+      exit 1
+    fi
+
+    conan remote add --insert 0 -f status-im https://conan.status.im
+    conan remote add --insert 1 -f bincrafters https://api.bintray.com/conan/bincrafters/public-conan
+
     if is_windows_target; then
-      export PATH=$STATUSREACTPATH:$PATH
-      if ! program_exists 'conan'; then
-        echo "${RED}Conan package manager not found. Exiting...${NC}"
-        exit 1
-      fi
-
-      conan remote add --insert 0 -f status-im https://conan.status.im
-
       echo "Generating cross-toolchain profile..."
       conan install -if ./desktop/toolchain/ -g json $WINDOWS_CROSSTOOLCHAIN_PKG_NAME/5.5.0-1@status-im/stable \
         -pr ./node_modules/status-conan/profiles/status-mingw32-x86_64

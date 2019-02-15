@@ -24,19 +24,19 @@ macro(import_qt_modules)
   endforeach(COMP ${USED_QT_MODULES})
 endmacro(import_qt_modules)
 
+# Download automatically, you can also just copy the conan.cmake file
+# TODO: Create packages of qt5 for Linux and MacOS too, so that we can rely strictly on this branch of code 
+if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
+    message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
+    file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/9cc97acda619b7917f140415241785a864482b11/conan.cmake"
+                  "${CMAKE_BINARY_DIR}/conan.cmake")
+endif()
+
+include(${CMAKE_BINARY_DIR}/conan.cmake)
+
+conan_check()
+
 if(WIN32)
-  # Download automatically, you can also just copy the conan.cmake file
-  # TODO: Create packages of qt5 for Linux and MacOS too, so that we can rely strictly on this branch of code 
-  if(NOT EXISTS "${CMAKE_BINARY_DIR}/conan.cmake")
-      message(STATUS "Downloading conan.cmake from https://github.com/conan-io/cmake-conan")
-      file(DOWNLOAD "https://raw.githubusercontent.com/conan-io/cmake-conan/9cc97acda619b7917f140415241785a864482b11/conan.cmake"
-                    "${CMAKE_BINARY_DIR}/conan.cmake")
-  endif()
-
-  include(${CMAKE_BINARY_DIR}/conan.cmake)
-
-  conan_check()
-
   if(USE_QTWEBKIT)
     set(_QT_PACKAGE_OPTIONS "qt5-mxe:webkit=True")
   endif()
@@ -47,9 +47,14 @@ if(WIN32)
                   BUILD never)
 
   set(QTROOT "${CONAN_QT5-MXE_ROOT}")
-else(WIN32)
-  set(QTROOT "$ENV{QT_PATH}")
-endif(WIN32)
+else()
+  conan_cmake_run(REQUIRES Qt/5.11.2@bincrafters/stable
+                  SETTINGS "compiler.version=5.5;compiler.libcxx=libstdc++"
+                  OPTIONS "qt:opengl=dynamic;qt:openssl=False;qt:qtbase=True;qt:qtsvg=True;qt:qtwebsockets=True;qt:widgets=True;qt:qtlocation=True;qt:qtserialport=True;qt:qtwebchannel=True"
+                  )
+
+  set(QTROOT "${CONAN_QT_ROOT}")
+endif()
 
 if(NOT EXISTS ${QTROOT}/bin/qt.conf)
   if(EXISTS ${QTROOT}/gcc_64/bin/qt.conf)
