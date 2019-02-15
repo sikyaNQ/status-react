@@ -6,6 +6,13 @@ let
     sha256 = "0fqasswfqrz2rbag9bz17j8y7615s0p9l23cw4sk2f384gk0zf6c";
   }) { config = { }; };
   nodejs = pkgs."nodejs-10_x";
+  conan = with pkgs; import ./scripts/lib/setup/nix/conan {
+    # Import a newer version of the Conan package to fix pylint issues with pinned one
+    # The remaining dependencies come from Nixpkgs
+    inherit lib;
+    inherit python3;
+    inherit git;
+  };
   nodeInputs = import ./scripts/lib/setup/nix/global-node-packages/output {
     # The remaining dependencies come from Nixpkgs
     inherit pkgs;
@@ -19,7 +26,7 @@ in pkgs.stdenv.mkDerivation rec {
     cmake
     extra-cmake-modules
     go_1_10
-  ] ++ stdenv.lib.optional stdenv.isLinux python37; # for Conan
+  ] ++ stdenv.lib.optional stdenv.isLinux conan;
   buildInputs = with pkgs; [
     clojure
     jq

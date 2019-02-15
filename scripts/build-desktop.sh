@@ -113,20 +113,10 @@ function init() {
     rm -rf ./desktop/toolchain/
     # TODO: Use Conan for Linux and MacOS builds too
     if is_windows_target; then
-      if ! program_exists 'python3'; then
-        echo "${RED}python3 prerequisite is missing. Exiting.${NC}"
-        exit 1
-      fi
-
       export PATH=$STATUSREACTPATH:$PATH
       if ! program_exists 'conan'; then
-        if ! program_exists 'pip3'; then
-          echo "${RED}pip3 package manager not found. Exiting.${NC}"
-          exit 1
-        fi
-
-        echo "${RED}Conan package manager not found. Installing...${NC}"
-        pip3 install conan==$(toolversion conan)
+        echo "${RED}Conan package manager not found. Exiting...${NC}"
+        exit 1
       fi
 
       conan remote add --insert 0 -f status-im https://conan.status.im
