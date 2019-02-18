@@ -2,8 +2,8 @@ let
   pkgs = import ((import <nixpkgs> { }).fetchFromGitHub {
     owner = "NixOS";
     repo = "nixpkgs";
-    rev = "168cbb39691cca2822ce1fdb3e8c0183af5c6d0d";
-    sha256 = "0fqasswfqrz2rbag9bz17j8y7615s0p9l23cw4sk2f384gk0zf6c";
+    rev = "b77c7e9f1d4c916e71ac271543d7ca9e5ed55862";
+    sha256 = "1np9llhsls5b0y281f61sp5kih4lag06qcrjlqvqnarvx4vrgjz9";
   }) { config = { }; };
   nodejs = pkgs."nodejs-10_x";
   conan = with pkgs; import ./scripts/lib/setup/nix/conan {
@@ -19,15 +19,16 @@ let
     inherit nodejs;
   };
   nodePkgs = (map (x: nodeInputs."${x}") (builtins.attrNames nodeInputs));
-in pkgs.stdenv.mkDerivation rec {
+in pkgs.stdenvNoCC.mkDerivation rec {
   name = "env";
   env = pkgs.buildEnv { name = name; paths = buildInputs; };
-  statusDesktopBuildInputs = with pkgs; [
+  statusDesktopBuildInputs = with pkgs; with stdenv; [
     cmake
     extra-cmake-modules
     go_1_10
-  ] ++ stdenv.lib.optional stdenv.isLinux conan;
-  buildInputs = with pkgs; [
+    qt5.full # Status Desktop, cannot be installed on macOS https://github.com/NixOS/nixpkgs/issues/55892
+  ] ++ lib.optional isLinux conan;
+  buildInputs = with pkgs; with stdenv; [
     clojure
     jq
     leiningen
@@ -41,7 +42,8 @@ in pkgs.stdenv.mkDerivation rec {
     yarn
   ] ++ nodePkgs
     ++ statusDesktopBuildInputs
-    ++ stdenv.lib.optional stdenv.isDarwin cocoapods;
+    ++ lib.optional isDarwin [clang cocoapods]
+    ++ lib.optional isLinux gcc7;
   shellHook = with pkgs; ''
       local toolversion="$(git rev-parse --show-toplevel)/scripts/toolversion"
 
@@ -52,6 +54,7 @@ in pkgs.stdenv.mkDerivation rec {
       export ANDROID_NDK_HOME="$ANDROID_NDK_ROOT"
       export ANDROID_NDK="$ANDROID_NDK_ROOT"
       export PATH="$ANDROID_HOME/bin:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools:$PATH"
+      export QT_PATH="${qt5.full}"
 
       [ -d "$ANDROID_NDK_ROOT" ] || ./scripts/setup # we assume that if the NDK dir does not exist, `make setup` needs to be run
   '';
