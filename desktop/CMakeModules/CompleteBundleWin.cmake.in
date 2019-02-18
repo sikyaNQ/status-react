@@ -7,7 +7,7 @@ set(TARGET_DIR "${@APP_NAME@_BINARY_DIR}")
 #
 ##########################################################################################################
 
-set(qtmodules Core Quick QuickTemplates2 QuickControls2 WebSockets Widgets Gui Network Svg Qml Concurrent)
+set(qtmodules Core Quick QuickTemplates2 QuickControls2 WebSockets Widgets Gui Network Svg Qml)
 if(USE_QTWEBKIT)
   set(qtmodules ${qtmodules} Multimedia WebKit WebKitWidgets WebChannel)
 

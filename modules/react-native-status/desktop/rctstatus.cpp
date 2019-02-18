@@ -20,7 +20,7 @@
 #include <QVariantMap>
 #include <QDir>
 #include <QStandardPaths>
-#include <QtConcurrent>
+#include <future>
 
 #include "libstatus.h"
 
@@ -131,7 +131,7 @@ void RCTStatus::stopNode() {
 void RCTStatus::createAccount(QString password, double callbackId) {
     Q_D(RCTStatus);
     qCInfo(RCTSTATUS) << "::createAccount call - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString password, double callbackId) {
+    std::async(std::launch::async, [&](QString password, double callbackId) {
             const char* result = CreateAccount(password.toUtf8().data());
             logStatusGoResult("::createAccount CreateAccount", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -142,7 +142,7 @@ void RCTStatus::createAccount(QString password, double callbackId) {
 void RCTStatus::sendDataNotification(QString dataPayloadJSON, QString tokensJSON, double callbackId) {
     Q_D(RCTStatus);
     qCDebug(RCTSTATUS) << "::sendDataNotification call - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString dataPayloadJSON, QString tokensJSON, double callbackId) {
+    std::async(std::launch::async, [&](QString dataPayloadJSON, QString tokensJSON, double callbackId) {
             const char* result = SendDataNotification(dataPayloadJSON.toUtf8().data(), tokensJSON.toUtf8().data());
             logStatusGoResult("::sendDataNotification SendDataNotification", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -244,7 +244,7 @@ void RCTStatus::sendLogs(QString dbJSON) {
 void RCTStatus::addPeer(QString enode, double callbackId) {
     Q_D(RCTStatus);
     qCDebug(RCTSTATUS) << "::addPeer call - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString enode, double callbackId) {
+    std::async(std::launch::async, [&](QString enode, double callbackId) {
             const char* result = AddPeer(enode.toUtf8().data());
             logStatusGoResult("::addPeer AddPeer", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -255,7 +255,7 @@ void RCTStatus::addPeer(QString enode, double callbackId) {
 void RCTStatus::recoverAccount(QString passphrase, QString password, double callbackId) {
     Q_D(RCTStatus);
     qCInfo(RCTSTATUS) << "::recoverAccount call - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString passphrase, QString password, double callbackId) {
+    std::async(std::launch::async, [&](QString passphrase, QString password, double callbackId) {
             const char* result = RecoverAccount(password.toUtf8().data(), passphrase.toUtf8().data());
             logStatusGoResult("::recoverAccount RecoverAccount", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -266,7 +266,7 @@ void RCTStatus::recoverAccount(QString passphrase, QString password, double call
 void RCTStatus::login(QString address, QString password, double callbackId) {
     Q_D(RCTStatus);
     qCInfo(RCTSTATUS) << "::login call - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString address, QString password, double callbackId) {
+    std::async(std::launch::async, [&](QString address, QString password, double callbackId) {
             const char* result = Login(address.toUtf8().data(), password.toUtf8().data());
             logStatusGoResult("::login Login", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -276,7 +276,7 @@ void RCTStatus::login(QString address, QString password, double callbackId) {
 void RCTStatus::verify(QString address, QString password, double callbackId) {
     Q_D(RCTStatus);
     qCInfo(RCTSTATUS) << "::verify call - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString address, QString password, double callbackId) {
+    std::async(std::launch::async, [&](QString address, QString password, double callbackId) {
             QDir rootDir(getDataStoragePath());
             QString keystorePath = rootDir.absoluteFilePath("keystore");
             const char* result = VerifyAccountPassword(keystorePath.toUtf8().data(), address.toUtf8().data(), password.toUtf8().data());
@@ -290,7 +290,7 @@ void RCTStatus::verify(QString address, QString password, double callbackId) {
 void RCTStatus::sendTransaction(QString txArgsJSON, QString password, double callbackId) {
     Q_D(RCTStatus);
     qCDebug(RCTSTATUS) << "::sendTransaction call - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString txArgsJSON, QString password, double callbackId) {
+    std::async(std::launch::async, [&](QString txArgsJSON, QString password, double callbackId) {
             const char* result = SendTransaction(txArgsJSON.toUtf8().data(), password.toUtf8().data());
             logStatusGoResult("::sendTransaction SendTransaction", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -301,7 +301,7 @@ void RCTStatus::sendTransaction(QString txArgsJSON, QString password, double cal
 void RCTStatus::signMessage(QString rpcParams, double callbackId) {
     Q_D(RCTStatus);
     qCDebug(RCTSTATUS) << "::signMessage call - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString rpcParams, double callbackId) {
+    std::async(std::launch::async, [&](QString rpcParams, double callbackId) {
             const char* result = SignMessage(rpcParams.toUtf8().data());
             logStatusGoResult("::signMessage SignMessage", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -311,7 +311,7 @@ void RCTStatus::signMessage(QString rpcParams, double callbackId) {
 void RCTStatus::signGroupMembership(QString content, double callbackId) {
     Q_D(RCTStatus);
     qCDebug(RCTSTATUS) << "::signGroupMembership - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString content, double callbackId) {
+    std::async(std::launch::async, [&](QString content, double callbackId) {
             const char* result = SignGroupMembership(content.toUtf8().data());
             logStatusGoResult("::signGroupMembership SignGroupMembership", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -321,7 +321,7 @@ void RCTStatus::signGroupMembership(QString content, double callbackId) {
 void RCTStatus::extractGroupMembershipSignatures(QString signatures, double callbackId) {
     Q_D(RCTStatus);
     qCDebug(RCTSTATUS) << "::extractGroupMembershipSignatures - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString signatures, double callbackId) {
+    std::async(std::launch::async, [&](QString signatures, double callbackId) {
             const char* result = ExtractGroupMembershipSignatures(signatures.toUtf8().data());
             logStatusGoResult("::extractGroupMembershipSignatures ExtractGroupMembershipSignatures", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -330,7 +330,7 @@ void RCTStatus::extractGroupMembershipSignatures(QString signatures, double call
 
 void RCTStatus::enableInstallation(QString installationId, double callbackId) {
     Q_D(RCTStatus);
-    QtConcurrent::run([&](QString installationId, double callbackId) {
+    std::async(std::launch::async, [&](QString installationId, double callbackId) {
             const char* result = EnableInstallation(installationId.toUtf8().data());
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
         }, installationId, callbackId);
@@ -338,7 +338,7 @@ void RCTStatus::enableInstallation(QString installationId, double callbackId) {
 
 void RCTStatus::disableInstallation(QString installationId, double callbackId) {
     Q_D(RCTStatus);
-    QtConcurrent::run([&](QString installationId, double callbackId) {
+    std::async(std::launch::async, [&](QString installationId, double callbackId) {
             const char* result = DisableInstallation(installationId.toUtf8().data());
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
         }, installationId, callbackId);
@@ -368,7 +368,7 @@ void RCTStatus::clearStorageAPIs() {
 void RCTStatus::callRPC(QString payload, double callbackId) {
     Q_D(RCTStatus);
     qCDebug(RCTSTATUS) << "::callRPC call - payload:" << payload.left(128) << "callbackId:" << callbackId;
-    QtConcurrent::run([&](QString payload, double callbackId) {
+    std::async(std::launch::async, [&](QString payload, double callbackId) {
             const char* result = CallRPC(payload.toUtf8().data());
             logStatusGoResult("::callRPC CallRPC", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -378,7 +378,7 @@ void RCTStatus::callRPC(QString payload, double callbackId) {
 void RCTStatus::callPrivateRPC(QString payload, double callbackId) {
     Q_D(RCTStatus);
     qCDebug(RCTSTATUS) << "::callPrivateRPC call - payload:" << payload.left(128) << "callbackId:" << callbackId;
-    QtConcurrent::run([&](QString payload, double callbackId) {
+    std::async(std::launch::async, [&](QString payload, double callbackId) {
             const char* result = CallPrivateRPC(payload.toUtf8().data());
             logStatusGoResult("::callPrivateRPC CallPrivateRPC", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
@@ -428,7 +428,7 @@ void RCTStatus::logStatusGoResult(const char* methodName, const char* result)
 void RCTStatus::updateMailservers(QString enodes, double callbackId) {
     Q_D(RCTStatus);
     qCDebug(RCTSTATUS) << "::updateMailservers call - callbackId:" << callbackId;
-    QtConcurrent::run([&](QString enodes, double callbackId) {
+    std::async(std::launch::async, [&](QString enodes, double callbackId) {
             const char* result = UpdateMailservers(enodes.toUtf8().data());
             logStatusGoResult("::updateMailservers UpdateMailservers", result);
             d->bridge->invokePromiseCallback(callbackId, QVariantList{result});
