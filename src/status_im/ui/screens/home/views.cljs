@@ -121,11 +121,11 @@
                              :multiline       false
                              :ref             #(reset! input-ref %)
                              :style           (merge {:flex        1
-                                                      :line-height 22
                                                       :font-size   15}
                                                      (when platform/android?
-                                                       {:margin  0
-                                                        :padding 0}))
+                                                       {:line-height 22
+                                                        :margin      0
+                                                        :padding     0}))
                              :default-value   search-filter
                              :on-focus
                              #(do
@@ -319,7 +319,8 @@
             [components/activity-indicator {:flex 1
                                             :animating true}]]
            :else
-           [react/view {:style {:flex 1}}
+           [react/view {:style {:flex 1
+                                :z-index -1}}
             [connectivity/connectivity-view]
             [home-items-view search-filter home-items]])
      (when platform/android?
