@@ -76,6 +76,8 @@ function joinExistingPath() {
   fi
 }
 
+function join { local IFS="$1"; shift; echo "$*"; }
+
 STATUSREACTPATH="$(cd "$SCRIPTPATH" && cd '..' && pwd)"
 WORKFOLDER="$(joinExistingPath "$STATUSREACTPATH" 'StatusImPackage')"
 DEPLOYQTFNAME='linuxdeployqt-continuous-x86_64_20181215.AppImage'
@@ -252,6 +254,42 @@ function bundleWindows() {
            ./deployment/windows/nsis/setup.nsi
 }
 
+if [[ "$OS" =~ Linux ]]; then
+  #
+  # get_recursive_dependencies will use ldd to go through the dependencies of a library,
+  # and output those which are ELF binaries
+  #
+  declare -A treated_libs=()
+  declare -A treated_package_dirs=()
+  function get_recursive_dependencies() {
+    local args=("$@")
+    local root_lib=(${args[0]})
+    treated_libs["$root_lib"]=1
+    if program_exists 'realpath'; then
+      root_lib=$(realpath -m "$root_lib" 2> /dev/null)
+    fi
+    echo $root_lib
+
+    [ -x $root_lib ] || return
+
+    local nix_package_dep_libs=($(ldd $root_lib | grep '=>' | awk -F'=>' -F ' ' "/^.*/{print \$3}"))
+    [ ${#nix_package_dep_libs[@]} -eq 0 ] && return
+
+    local nix_package_dep_libs_dirs=$(echo ${nix_package_dep_libs[@]} | xargs dirname | xargs realpath | sort -u | uniq | grep "^/nix")
+    for packageLibDir in $nix_package_dep_libs_dirs; do
+      if ! [ ${treated_package_dirs[$packageLibDir]} ]; then
+        treated_package_dirs["$packageLibDir"]=1
+        for lib in $(ls $packageLibDir/*.so* | xargs realpath | sort | uniq); do
+          local type=$(file $lib | awk -F':' "/^.*/{print \$2}" | awk -F' ' "/^.*/{print \$1}")
+          if [ $type == 'ELF' ]; then
+            [ ${treated_libs[$lib]} ] || get_recursive_dependencies "$lib"
+          fi
+        done
+      fi
+    done
+  }
+fi
+
 function bundleLinux() {
   local QTBIN=$(joinExistingPath "$QT_PATH" 'gcc_64/bin')
   if [ ! -d "$QTBIN" ]; then
@@ -280,7 +318,7 @@ function bundleLinux() {
   cp -r ./deployment/linux/usr $WORKFOLDER/AppDir
   cp ./.env $usrBinPath
   cp ./desktop/bin/Status ./desktop/bin/reportApp $usrBinPath
-  
+
   if [ ! -f $DEPLOYQT ]; then
     wget --output-document="$DEPLOYQT" --show-progress "https://desktop-app-files.ams3.digitaloceanspaces.com/$DEPLOYQTFNAME" # Versioned from https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
     chmod a+x $DEPLOYQT
@@ -293,7 +331,7 @@ function bundleLinux() {
 
   rm -f Application-x86_64.AppImage Status-x86_64.AppImage
 
-  [ $VERBOSE_LEVEL -ge 1 ] && ldd $(joinExistingPath "$usrBinPath" 'Status') 
+  [ $VERBOSE_LEVEL -ge 1 ] && ldd $(joinExistingPath "$usrBinPath" 'Status')
   desktopFilePath="$(joinExistingPath "$WORKFOLDER" 'AppDir/usr/share/applications/Status.desktop')"
   pushd $WORKFOLDER
     cp -r assets/share/assets $usrBinPath
@@ -301,6 +339,12 @@ function bundleLinux() {
     rm -f $usrBinPath/Status.AppImage
   popd
 
+  # Ensure the binary isn't using the interpreter in Nix's store
+  patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "$usrBinPath/Status"
+  # Tell linuxdeployqt about all the different lib folders in Nix's store 
+  local all_deps=($(get_recursive_dependencies "$usrBinPath/Status"))
+  local unique_folders=($(echo "${all_deps[@]}" | xargs dirname | sort -u -r | uniq | grep "/nix"))
+  LD_LIBRARY_PATH="$(join : ${unique_folders[@]})" \
   $DEPLOYQT \
     $desktopFilePath \
     -verbose=$VERBOSE_LEVEL -always-overwrite -no-strip \

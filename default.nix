@@ -27,7 +27,7 @@ in pkgs.stdenvNoCC.mkDerivation rec {
     extra-cmake-modules
     go_1_10
     qt5.full # Status Desktop, cannot be installed on macOS https://github.com/NixOS/nixpkgs/issues/55892
-  ] ++ stdenv.lib.optional stdenv.isLinux conan;
+  ] ++ stdenv.lib.optional stdenv.isLinux [conan patchelf];
   buildInputs = with pkgs; [
     gcc7
     clojure
