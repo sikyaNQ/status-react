@@ -99,7 +99,7 @@
         input-ref (reagent/atom nil)]
     (fn [search-filter]
       (let [show-cancel? (or @input-is-focused?
-                             (not-empty search-filter))]
+                             search-filter)]
         [react/view {:style {:height             search-input-height
                              :flex-direction     :row
                              :padding-horizontal 16
@@ -119,18 +119,18 @@
           [react/text-input {:placeholder     (i18n/label :t/search)
                              :blur-on-submit  true
                              :multiline       false
-                             :number-of-lines 1
                              :ref             #(reset! input-ref %)
-                             :style           {:flex        1
-                                               :margin      0
-                                               :padding     0
-                                               :line-height 22
-                                               :font-size   15}
+                             :style           (merge {:flex        1
+                                                      :line-height 22
+                                                      :font-size   15}
+                                                     (when platform/android?
+                                                       {:margin  0
+                                                        :padding 0}))
                              :default-value   search-filter
                              :on-focus
                              #(do
                                 (when on-focus
-                                  (on-focus))
+                                  (on-focus search-filter))
                                 (reset! input-is-focused? true))
                              :on-change
                              (fn [e]
@@ -163,76 +163,125 @@
                {:title :t/messages
                 :data []}]
     :key-fn first
-    :render-section-header-fn (fn [{:keys [title data]}]
-                                [react/text {:style {:font-size   15
-                                                     :margin-left 16
-                                                     :margin-top  16
-                                                     :color       colors/gray}}
-                                 (i18n/label title)])
-    :render-section-footer-fn (fn [{:keys [title data]}]
-                                (when (empty? data)
-                                  [list/big-list-item {:text          (i18n/label (if (= title "messages")
-                                                                                    :t/messages-search-coming-soon
-                                                                                    :t/no-result))
-                                                       :text-color    colors/gray
-                                                       :hide-chevron? true
-                                                       :action-fn     #()
-                                                       :icon          (case title
-                                                                        "messages" :main-icons/private-chat
-                                                                        "browsers" :main-icons/browser
-                                                                        "chats"    :main-icons/message)
-                                                       :icon-color    colors/gray}]))
+    :render-section-header-fn
+    (fn [{:keys [title data]}]
+      [react/view {:style {:height 40}}
+       [react/text {:style {:font-size     15
+                            :margin-left   16
+                            :margin-top    14
+                            :margin-bottom 4
+                            :color         colors/gray}}
+        (i18n/label title)]])
+    :render-section-footer-fn
+    (fn [{:keys [title data]}]
+      (when (empty? data)
+        [list/big-list-item {:text          (i18n/label (if (= title "messages")
+                                                          :t/messages-search-coming-soon
+                                                          :t/no-result))
+                             :text-color    colors/gray
+                             :hide-chevron? true
+                             :action-fn     #()
+                             :icon          (case title
+                                              "messages" :main-icons/private-chat
+                                              "browsers" :main-icons/browser
+                                              "chats"    :main-icons/message)
+                             :icon-color    colors/gray}]))
     :render-fn (fn [home-item]
                  [home-list-item home-item])}])
 
 (defn hide-search-input
-  [anim-search-input-height]
+  [anim-search-input-height anim-search-input-Y-translation]
   (animation/start
-   (animation/timing anim-search-input-height
-                     {:toValue  0
-                      :duration 350
-                      :easing   (.in (animation/easing)
-                                     (.-quad (animation/easing)))})))
+   (animation/parallel
+    [(animation/timing anim-search-input-Y-translation
+                       {:toValue  (- search-input-height)
+                        :duration 350
+                        :easing   (.in (animation/easing)
+                                       (.-quad (animation/easing)))})
+     (animation/timing anim-search-input-height
+                       {:toValue  0
+                        :duration 350
+                        :easing   (.in (animation/easing)
+                                       (.-quad (animation/easing)))})])))
 
 (defn show-search-input
-  [anim-search-input-height]
+  [anim-search-input-height anim-search-input-Y-translation]
   (animation/start
-   (animation/timing anim-search-input-height
-                     {:toValue  search-input-height
-                      :duration 350
-                      :easing   (.out (animation/easing)
-                                      (.-quad (animation/easing)))})))
+   (animation/parallel
+    [(animation/timing anim-search-input-Y-translation
+                       {:toValue  0
+                        :duration 350
+                        :easing   (.out (animation/easing)
+                                        (.-quad (animation/easing)))})
+     (animation/timing anim-search-input-height
+                       {:toValue  search-input-height
+                        :duration 350
+                        :easing   (.out (animation/easing)
+                                        (.-quad (animation/easing)))})])))
 
 (defn home-items-view
   [search-filter {:keys [chats browsers all-home-items] :as home-items}]
-  (let [scrolling-from-top? (reagent/atom false)
-        anim-search-input-height (animation/create-value 0)]
+  (let [can-show-search? (reagent/atom true)
+        previous-touch (reagent/atom nil)
+        anim-search-input-Y-translation
+        (animation/create-value (if search-filter
+                                  0
+                                  (- search-input-height)))
+        anim-search-input-height
+        (animation/create-value (if search-filter
+                                  search-input-height
+                                  0))]
     (fn [search-filter {:keys [chats browsers all-home-items] :as home-items}]
       (if home-items
         [react/view
-         [react/animated-view {:style {:height anim-search-input-height}}
-          [search-input search-filter {:on-cancel #(do
-                                                     (re-frame/dispatch [:search/filter-changed nil])
-                                                     (hide-search-input anim-search-input-height))
-                                       :on-focus  #(when-not search-filter
-                                                     (re-frame/dispatch [:search/filter-changed ""]))
-                                       :on-change (fn [text]
-                                                    (re-frame/dispatch [:search/filter-changed text]))}]]
+         {:style {:flex 1}
+          :on-start-should-set-responder-capture
+          (fn [event]
+            (when @can-show-search?
+              (let [current-position (.-pageY (.-nativeEvent event))
+                    current-timestamp (.-timestamp (.-nativeEvent event))]
+                (reset! previous-touch
+                        [current-position current-timestamp])))
+
+            false)
+          :on-move-should-set-responder
+          (fn [event]
+            (when @can-show-search?
+              (let [current-position (.-pageY (.-nativeEvent event))
+                    current-timestamp (.-timestamp (.-nativeEvent event))
+                    [previous-position previous-timestamp] @previous-touch]
+                (when (and previous-position
+                           (> 100 (- current-timestamp previous-timestamp))
+                           (< 10 (- current-position
+                                    previous-position)))
+                  (show-search-input anim-search-input-height
+                                     anim-search-input-Y-translation)
+                  (reset! can-show-search? false))))
+            false)}
+         [react/animated-view
+          {:style {:height           anim-search-input-height
+                   :transform        [{:translateY anim-search-input-Y-translation}]
+                   :background-color colors/white}}
+          [search-input search-filter
+           {:on-cancel #(do
+                          (re-frame/dispatch [:search/filter-changed nil])
+                          (reset! can-show-search? true)
+                          (hide-search-input anim-search-input-height
+                                             anim-search-input-Y-translation))
+            :on-focus  (fn [search-filter]
+                         (when-not search-filter
+                           (re-frame/dispatch [:search/filter-changed ""])))
+            :on-change (fn [text]
+                         (re-frame/dispatch [:search/filter-changed text]))}]]
          (case search-filter
-           nil [list/flat-list {:data   all-home-items
-                                :key-fn first
+           nil [list/flat-list {:data           all-home-items
+                                :key-fn         first
+                                :end-fill-color colors/white
                                 :on-scroll-begin-drag
                                 (fn [e]
-                                  (when (and
-                                         (not @scrolling-from-top?)
-                                         (zero? (.-y (.-contentOffset (.-nativeEvent e)))))
-                                    (reset! scrolling-from-top? true)))
-                                :on-scroll-end-drag
-                                (fn [e]
-                                  (when (and @scrolling-from-top?
-                                             (zero? (.-y (.-contentOffset (.-nativeEvent e)))))
-                                    (reset! scrolling-from-top? false)
-                                    (show-search-input anim-search-input-height)))
+                                  (reset! can-show-search?
+                                          ;; check if scrolling up from top of list
+                                          (zero? (.-y (.-contentOffset (.-nativeEvent e))))))
                                 :render-fn
                                 (fn [home-item]
                                   [home-list-item home-item])}]
