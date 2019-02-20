@@ -1,6 +1,7 @@
 (ns status-im.ui.components.status-bar.view
   (:require [status-im.ui.components.react :as react]
-            [status-im.ui.components.status-bar.styles :as styles]))
+            [status-im.ui.components.status-bar.styles :as styles]
+            [status-im.utils.platform :as platform]))
 
 (defn status-bar [{:keys [type flat?]}]
   (let [[status-bar-style view-style]
@@ -14,6 +15,7 @@
           :wallet       [styles/status-bar-wallet styles/view-wallet]
           :wallet-tab   [styles/status-bar-wallet-tab styles/view-wallet-tab]
           [styles/status-bar-default styles/view-default])]
-    [react/view
-     [react/status-bar (cond-> status-bar-style flat? (assoc :elevation 0))]
-     [react/view {:style (cond-> view-style flat? (assoc :elevation 0))}]]))
+    (when-not platform/desktop?
+      [react/view
+       [react/status-bar (cond-> status-bar-style flat? (assoc :elevation 0))]
+       [react/view {:style (cond-> view-style flat? (assoc :elevation 0))}]])))

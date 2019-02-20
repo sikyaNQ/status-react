@@ -143,10 +143,7 @@
   {:flex              1
    :align-items       :center
    :justify-content   :center
-   :margin-horizontal 34
-   :background-color  colors/green
-   :border-color colors/black
-   :border-width 1  })
+   :margin-horizontal 34})
 
 (def no-chats-text
   {:line-height    21
