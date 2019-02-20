@@ -56,7 +56,6 @@ if (CMAKE_CROSSCOMPILING)
                             "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
                             "-DCMAKE_C_COMPILER_AR=${CMAKE_C_COMPILER_AR}"
                             "-DCMAKE_C_COMPILER_RANLIB=${CMAKE_C_COMPILER_RANLIB}"
-                            "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
                             "-DCMAKE_CXX_COMPILER_AR=${CMAKE_CXX_COMPILER_AR}"
                             "-DCMAKE_CXX_COMPILER_RANLIB=${CMAKE_CXX_COMPILER_RANLIB}"
                             "-DCMAKE_LINKER=${CMAKE_LINKER}"
@@ -71,6 +70,7 @@ ExternalProject_Add(SnoreNotify_ep
   GIT_TAG 9d54904e4896ab6c3c3a52f97381e5948b455970
   GIT_SHALLOW TRUE
   CMAKE_ARGS ${SnoreNotify_CMAKE_ARGS}
+             "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
   BUILD_BYPRODUCTS ${SnoreNotify_STATIC_LIB} ${SnoreNotify_LIBS} ${SnoreNotifyBackend_STATIC_LIB}
                    ${SnoreNotifyBackendSettings_STATIC_LIB} ${SnoreNotifySettings_STATIC_LIB}
   LOG_DOWNLOAD 1

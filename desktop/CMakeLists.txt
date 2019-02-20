@@ -6,7 +6,7 @@
 # LICENSE file in the root directory of this source tree. An additional grant
 # of patent rights can be found in the PATENTS file in the same directory.
 
-cmake_minimum_required(VERSION 2.8.11)
+cmake_minimum_required(VERSION 3.12.0)
 
 set(APP_NAME Status)
 set(JS_APP_NAME StatusIm)
@@ -22,7 +22,7 @@ set(CMAKE_INSTALL_PREFIX bin)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_PREFIX}" CACHE PATH "Where to place compiled executables.")
 set(${APP_NAME}_BINARY_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.10")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/CMakeModules/")
 

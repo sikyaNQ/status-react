@@ -1,9 +1,9 @@
 let
   pkgs = import ((import <nixpkgs> { }).fetchFromGitHub {
-    owner = "NixOS";
+    owner = "status-im";
     repo = "nixpkgs";
-    rev = "b77c7e9f1d4c916e71ac271543d7ca9e5ed55862";
-    sha256 = "1np9llhsls5b0y281f61sp5kih4lag06qcrjlqvqnarvx4vrgjz9";
+    rev = "e7a8e639ced45bc426a79a5ad734440ba6c2845e";
+    sha256 = "1180yy59k6l93cqvf7fck6hx710qgzn9qhw3akx62659lza3h8hm";
   }) { config = { }; };
   nodejs = pkgs."nodejs-10_x";
   conan = with pkgs; import ./scripts/lib/setup/nix/conan {

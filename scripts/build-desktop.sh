@@ -15,10 +15,14 @@ if [ -z $TARGET_SYSTEM_NAME ]; then
 fi
 WINDOWS_CROSSTOOLCHAIN_PKG_NAME='mxetoolchain-x86_64-w64-mingw32'
 
-if [ -z $STATUS_NO_LOGGING ]; then
-  COMPILE_FLAGS="-DCMAKE_CXX_FLAGS:='-DBUILD_FOR_BUNDLE=1'"
-else
-  COMPILE_FLAGS="-DCMAKE_CXX_FLAGS:=-DBUILD_FOR_BUNDLE=1 -DSTATUS_NO_LOGGING=1"
+CMAKE_EXTRA_FLAGS="-DCMAKE_CXX_FLAGS:=-DBUILD_FOR_BUNDLE=1"
+[ -n $STATUS_NO_LOGGING ] && CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DSTATUS_NO_LOGGING=1"
+is_macos && CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_CXX_COMPILER=g++"
+if is_windows_target; then
+  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_TOOLCHAIN_FILE='Toolchain-Ubuntu-mingw64.cmake'"
+  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_C_COMPILER='x86_64-w64-mingw32.shared-gcc'"
+  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_CXX_COMPILER='x86_64-w64-mingw32.shared-g++'"
+  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_RC_COMPILER='x86_64-w64-mingw32.shared-windres'"
 fi
 
 external_modules_dir=( \
@@ -183,24 +187,13 @@ function compile() {
         fi
         export PATH=$bin_dir:$PATH
       done <<< "$bin_dirs"
-      cmake -Wno-dev \
-            -DCMAKE_TOOLCHAIN_FILE='Toolchain-Ubuntu-mingw64.cmake' \
-            -DCMAKE_C_COMPILER='x86_64-w64-mingw32.shared-gcc' \
-            -DCMAKE_CXX_COMPILER='x86_64-w64-mingw32.shared-g++' \
-            -DCMAKE_RC_COMPILER='x86_64-w64-mingw32.shared-windres' \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DEXTERNAL_MODULES_DIR="$EXTERNAL_MODULES_DIR" \
-            -DDESKTOP_FONTS="$DESKTOP_FONTS" \
-            -DJS_BUNDLE_PATH="$JS_BUNDLE_PATH" \
-            $COMPILE_FLAGS || exit 1
-    else
-      cmake -Wno-dev \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DEXTERNAL_MODULES_DIR="$EXTERNAL_MODULES_DIR" \
-            -DDESKTOP_FONTS="$DESKTOP_FONTS" \
-            -DJS_BUNDLE_PATH="$JS_BUNDLE_PATH" \
-            $COMPILE_FLAGS || exit 1
     fi
+    cmake -Wno-dev \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DEXTERNAL_MODULES_DIR="$EXTERNAL_MODULES_DIR" \
+          -DDESKTOP_FONTS="$DESKTOP_FONTS" \
+          -DJS_BUNDLE_PATH="$JS_BUNDLE_PATH" \
+          $CMAKE_EXTRA_FLAGS || exit 1
     make -S -j5 || exit 1
   popd
 }
@@ -367,6 +360,16 @@ function bundleLinux() {
   echo ""
 }
 
+function fixupNixQtLibrariesInApp() {
+  local appPath="$1"
+  local libs=$(otool -L "$appPath" | grep "/nix/store/" | awk -F ' ' "/^.*/{print \$1}")
+  local options=()
+  for lib in ${libs[@]}; do
+    options+=("-change '${lib}' '@executable_path/../Frameworks/$(basename ${lib})'")
+  done
+  eval "install_name_tool ${options[@]} $appPath"
+}
+
 function bundleMacOS() {
   # download prepared package with mac bundle files (it contains qt libraries, icon)
   echo "Downloading skeleton of mac bundle..."
@@ -387,16 +390,14 @@ function bundleMacOS() {
     ln -sf ../Resources/.env Status.app/Contents/MacOS/.env
     cp -f ../deployment/macos/qt-reportApp.conf Status.app/Contents/Resources
     ln -sf ../Resources/qt-reportApp.conf Status.app/Contents/MacOS/qt.conf
-    install_name_tool -add_rpath "@executable_path/../Frameworks" \
-                      -delete_rpath "${QT_PATH}/lib" \
-                      'Status.app/Contents/MacOS/reportApp'
-    install_name_tool -add_rpath "@executable_path/../Frameworks" \
-                      -delete_rpath "${QT_PATH}/lib" \
-                      'Status.app/Contents/MacOS/Status'
+    fixupNixQtLibrariesInApp 'Status.app/Contents/MacOS/reportApp'
+    fixupNixQtLibrariesInApp 'Status.app/Contents/MacOS/Status'
     cp -f ../deployment/macos/Info.plist Status.app/Contents
     cp -f ../deployment/macos/status-icon.icns Status.app/Contents/Resources
-    $DEPLOYQT Status.app -verbose=$VERBOSE_LEVEL \
-      -qmldir="$STATUSREACTPATH/node_modules/react-native/ReactQt/runtime/src/qml/"
+    $DEPLOYQT Status.app \
+      -verbose=$VERBOSE_LEVEL \
+      -qmldir="$(joinExistingPath "$STATUSREACTPATH" 'node_modules/react-native')" \
+      -qmldir="$(joinExistingPath "$STATUSREACTPATH" 'desktop/reportApp')"
     rm -f Status.app.zip
   popd
 
