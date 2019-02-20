@@ -19,7 +19,7 @@ let
     inherit nodejs;
   };
   nodePkgs = (map (x: nodeInputs."${x}") (builtins.attrNames nodeInputs));
-in pkgs.stdenvNoCC.mkDerivation rec {
+in pkgs.stdenv.mkDerivation rec {
   name = "env";
   env = pkgs.buildEnv { name = name; paths = buildInputs; };
   statusDesktopBuildInputs = with pkgs; [
@@ -29,7 +29,6 @@ in pkgs.stdenvNoCC.mkDerivation rec {
     qt5.full # Status Desktop, cannot be installed on macOS https://github.com/NixOS/nixpkgs/issues/55892
   ] ++ stdenv.lib.optional stdenv.isLinux [conan patchelf];
   buildInputs = with pkgs; [
-    gcc7
     clojure
     jq
     leiningen
