@@ -40,6 +40,7 @@
 (def request-timeout 30)
 (def min-limit 200)
 (def max-limit 2000)
+(def backoff-interval-ms 3000)
 (def default-limit max-limit)
 (def connection-timeout
   "Time after which mailserver connection is considered to have failed"
@@ -290,7 +291,8 @@
                           (log/info "mailserver: messages request success for topic " topics "from" from "to" to)
                           (do
                             (log/error "mailserver: messages request error for topic " topics ": " error)
-                            (re-frame/dispatch [:mailserver.callback/request-error (i18n/label :t/mailserver-request-error-title)])))))))
+                            (utils/set-timeout #(re-frame/dispatch [:mailserver.callback/resend-request {:request-id "failed-request"}])
+                                               backoff-interval-ms)))))))
 
 (re-frame/reg-fx
  :mailserver/request-messages
