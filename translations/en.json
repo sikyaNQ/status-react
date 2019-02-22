@@ -887,6 +887,7 @@
     "tribute-state-required": "Requires {{snt-amount}} SNT tribute",
     "tribute-state-pending": "Tribute pending...",
     "tribute-state-paid": "Tribute paid",
+    "tribute-contact-requires-snt": "{{name}} requires SNT to start a chat.",
     "tribute-required-by-account": "{{account-name}} requires SNT to start a chat",
     "tribute-to-talk-are-you-friends": "Are you friends? Ask to be added as a contact",
     "tribute-to-talk-paywall-learn-more-1": "Our time and attention are our most valuable assets. Tribute to Talk lets you contact new people in exchange for an SNT payment.",

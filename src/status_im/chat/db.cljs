@@ -34,9 +34,10 @@
       (cond-> chat
         pending-invite-inviter-name
         (assoc :pending-invite-inviter-name pending-invite-inviter-name)
+        tributes
+        (assoc :tribute (tributes chat-id))
         :always
         (assoc :chat-name
-               :tribute (tributes chat-id)
                (chat-name chat nil))))))
 
 (defn active-chats

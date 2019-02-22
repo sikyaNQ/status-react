@@ -114,13 +114,15 @@
     (i18n/label :t/empty-chat-description)]])
 
 (defn empty-chat-container-one-to-one
-  [contact-name]
+  [contact-name tribute]
   [react/view style/empty-chat-container
    [vector-icons/icon :tiny-icons/tiny-lock]
    [react/text {:style style/empty-chat-text}
     [react/text style/empty-chat-container-one-to-one
      (i18n/label :t/empty-chat-description-one-to-one)]
-    [react/text {:style style/empty-chat-text-name} contact-name]]])
+    [react/text {:style style/empty-chat-text-name} contact-name]]
+   (when tribute
+     [react/text "Pay to chat"])])
 
 (defn join-chat-button [chat-id]
   [buttons/secondary-button {:style style/join-button
@@ -151,7 +153,9 @@
      [decline-chat chat-id]]]])
 
 (defview messages-view
-  [{:keys [group-chat name pending-invite-inviter-name messages-initialized?] :as chat}
+  [{:keys [group-chat name
+           pending-invite-inviter-name messages-initialized?
+           tribute] :as chat}
    modal?]
   (letsubs [messages           [:chats/current-chat-messages-stream]
             current-public-key [:account/public-key]]
@@ -170,7 +174,7 @@
            messages-initialized?)
       (if group-chat
         [empty-chat-container]
-        [empty-chat-container-one-to-one name])
+        [empty-chat-container-one-to-one name tribute])
 
       :else
       [list/flat-list {:data                      messages

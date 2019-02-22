@@ -235,6 +235,8 @@
   "Takes coeffects map and chat-id, returns effects necessary for navigation and preloading data"
   [cofx chat-id {:keys [modal? navigation-reset?]}]
   (cond
+    (not ((:contacts/contacts (:db cofx)) identity))
+    (fx/merge cofx {:dispatch [:chat.ui/check-tribute chat-id]})
     modal?
     (fx/merge cofx
               (navigation/navigate-to-cofx :chat-modal {})
