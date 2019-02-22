@@ -12,9 +12,9 @@
 (defn set-tribute [web3 contract public-key snt-amount]
   (ethereum/call web3
                  (ethereum/call-params contract "setRequiredTribute(uint256)" snt-amount)
-                 (fn [_ count])))
-gt
+                 (fn [_])))
+
 (defn get-tribute [web3 contract public-key cb]
   (ethereum/call web3
                  (ethereum/call-params contract "getFee(address)" public-key)
-                 (fn [_ count] (cb (ethereum/hex->int count)))))
+                 (fn [_ tribute] (cb tribute))))
