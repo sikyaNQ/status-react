@@ -82,10 +82,11 @@
 (re-frame/reg-sub
  :chats/active-chats
  :<- [:contacts/contacts]
+ :<- [:tribute/tributes]
  :<- [::chats]
  :<- [:account/account]
- (fn [[contacts chats account]]
-   (chat.db/active-chats contacts chats account)))
+ (fn [[contacts tributes chats account]]
+   (chat.db/active-chats contacts tributes chats account)))
 
 (re-frame/reg-sub
  :chats/current-chat
@@ -231,3 +232,13 @@
  :<- [:chats/current-chat]
  (fn [{:keys [metadata messages]}]
    (get messages (get-in metadata [:responding-to-message :message-id]))))
+
+(re-frame/reg-sub
+ :tribute/tributes
+ (fn [db _]
+   (get-in db [:accounts/account :tributes])))
+
+(re-frame/reg-sub
+ :tribute/get-tribute
+ (fn [db [_ identity]]
+   (get-in db [:accounts/account :tributes identity])))

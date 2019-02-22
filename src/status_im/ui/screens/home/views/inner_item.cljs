@@ -14,6 +14,7 @@
             [status-im.utils.datetime :as time]
             [status-im.utils.gfycat.core :as gfycat]
             [status-im.constants :as const]
+            [status-im.utils.tribute :as tribute]
             [status-im.ui.components.colors :as colors]
             [status-im.ui.components.chat-preview :as chat-preview]
             [status-im.ui.components.icons.vector-icons :as vector-icons]
@@ -97,6 +98,7 @@
            name color online
            group-chat public?
            public-key
+           tribute
            timestamp
            last-message-content
            last-message-content-type]}]
@@ -111,8 +113,13 @@
         [react/view styles/message-status-container
          [message-timestamp timestamp]]]
        [react/view styles/item-lower-container
-        [message-content-text {:content      last-message-content
-                               :content-type last-message-content-type}]
+        (let [tribute-status (tribute/status tribute)]
+          (if (and tribute-status
+                   (not= :paid (:status tribute-status)))
+            [react/text {:style               styles/last-message-text}
+             tribute-status]
+            [message-content-text {:content      last-message-content
+                                   :content-type last-message-content-type}]))
         [unviewed-indicator chat-id]]]]]))
 
 (defn home-list-browser-item-inner-view [{:keys [dapp url name browser-id] :as browser}]

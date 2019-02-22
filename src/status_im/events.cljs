@@ -53,6 +53,8 @@
             [status-im.node.core :as node]
             [cljs.reader :as edn]
             [status-im.stickers.core :as stickers]
+            [status-im.utils.ethereum.core :as ethereum.core]
+            [status-im.utils.ethereum.tribute :as ethereum.tribute]
             [status-im.utils.config :as config]))
 
 ;; init module
@@ -743,9 +745,33 @@
 
 (handlers/register-handler-fx
  :chat.ui/show-profile
- (fn [cofx [_ identity]]
-   (navigation/navigate-to-cofx
-    (assoc-in cofx [:db :contacts/identity] identity) :profile nil)))
+ (fn [{:keys [db] :as cofx} [_ identity]]
+   (cond-> (navigation/navigate-to-cofx
+            (assoc-in cofx [:db :contacts/identity] identity) :profile nil)
+     (not ((:contacts/contacts db) identity))
+     (assoc :dispatch [:chat.ui/check-tribute identity]))))
+
+(handlers/register-handler-fx
+ :chat.ui/set-tribute
+ (fn [{:keys [db] :as cofx}  [_ identity value]]
+   (update-in db [:accounts/account :tributes identity]
+              (fn [{:keys [status]}]
+                {:value value
+                 :status (or status :required)}))))
+
+(handlers/register-handler-fx
+ :chat.ui/pay-tribute
+ (fn [{:keys [db] :as cofx}  [_ identity status]]
+   (assoc-in db [:accounts/account :tributes identity :status] status)))
+
+(handlers/register-handler-fx
+ :chat.ui/check-tribute
+ (fn [{:keys [db] :as cofx}  [_ identity]]
+   (let [network           (get-in db [:account/account :networks (:network db)])
+         contract (get ethereum.tribute/contracts (ethereum.core/network->chain-keyword network))]
+     (ethereum.tribute/get-tribute (:web3 db) contract identity
+                                   #(re-frame/dispatch [:chat.ui/set-tribute identity %1]))
+     db)))
 
 (handlers/register-handler-fx
  :chat.ui/set-chat-input-text
