@@ -38,6 +38,7 @@
             [status-im.search.core :as search]
             [status-im.signals.core :as signals]
             [status-im.transport.message.core :as transport.message]
+            [status-im.transport.core :as transport]
             [status-im.ui.screens.currency-settings.models :as currency-settings.models]
             [status-im.chat.models.message :as models.message]
             [status-im.node.core :as node]
@@ -1698,3 +1699,8 @@
  :stickers/open-sticker-pack
  (fn [cofx [_ uri]]
    (stickers/open-sticker-pack cofx uri)))
+
+(handlers/register-handler-fx
+ :transport.callback/node-info-fetched
+ (fn [cofx [_ node-info]]
+   (transport/set-node-info cofx node-info)))

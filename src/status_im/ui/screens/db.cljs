@@ -41,6 +41,7 @@
              :wallet/all-tokens                  {}
              :prices                             {}
              :peers-count                        0
+             :node-info                          {}
              :peers-summary                      []
              :notifications                      {}
              :semaphores                         #{}
@@ -162,6 +163,7 @@
 (spec/def ::network (spec/nilable string?))
 (spec/def ::chain (spec/nilable string?))
 (spec/def ::peers-count (spec/nilable integer?))
+(spec/def ::node-info (spec/nilable map?))
 (spec/def ::peers-summary (spec/nilable vector?))
 
 (spec/def ::collectible (spec/nilable map?))
@@ -285,6 +287,7 @@
                                    ::tab-bar-visible?
                                    ::network-status
                                    ::peers-count
+                                   ::node-info
                                    ::peers-summary
                                    ::sync-state
                                    ::sync-data
