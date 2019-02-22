@@ -15,16 +15,6 @@ if [ -z $TARGET_SYSTEM_NAME ]; then
 fi
 WINDOWS_CROSSTOOLCHAIN_PKG_NAME='mxetoolchain-x86_64-w64-mingw32'
 
-CMAKE_EXTRA_FLAGS="-DCMAKE_CXX_FLAGS:=-DBUILD_FOR_BUNDLE=1"
-[ -n $STATUS_NO_LOGGING ] && CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DSTATUS_NO_LOGGING=1"
-is_macos && CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_CXX_COMPILER=g++"
-if is_windows_target; then
-  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_TOOLCHAIN_FILE='Toolchain-Ubuntu-mingw64.cmake'"
-  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_C_COMPILER='x86_64-w64-mingw32.shared-gcc'"
-  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_CXX_COMPILER='x86_64-w64-mingw32.shared-g++'"
-  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_RC_COMPILER='x86_64-w64-mingw32.shared-windres'"
-fi
-
 external_modules_dir=( \
   'node_modules/react-native-languages/desktop' \
   'node_modules/react-native-config/desktop' \
@@ -81,6 +71,16 @@ function joinExistingPath() {
 }
 
 function join { local IFS="$1"; shift; echo "$*"; }
+
+CMAKE_EXTRA_FLAGS=$'-DCMAKE_CXX_FLAGS:=\'-DBUILD_FOR_BUNDLE=1\''
+[ -n $STATUS_NO_LOGGING ] && CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DSTATUS_NO_LOGGING=1"
+is_macos && CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_CXX_COMPILER=g++"
+if is_windows_target; then
+  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_TOOLCHAIN_FILE='Toolchain-Ubuntu-mingw64.cmake'"
+  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_C_COMPILER='x86_64-w64-mingw32.shared-gcc'"
+  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_CXX_COMPILER='x86_64-w64-mingw32.shared-g++'"
+  CMAKE_EXTRA_FLAGS="$CMAKE_EXTRA_FLAGS -DCMAKE_RC_COMPILER='x86_64-w64-mingw32.shared-windres'"
+fi
 
 STATUSREACTPATH="$(cd "$SCRIPTPATH" && cd '..' && pwd)"
 WORKFOLDER="$(joinExistingPath "$STATUSREACTPATH" 'StatusImPackage')"
@@ -360,15 +360,26 @@ function bundleLinux() {
   echo ""
 }
 
-function fixupNixQtLibrariesInApp() {
-  local appPath="$1"
-  local libs=$(otool -L "$appPath" | grep "/nix/store/" | awk -F ' ' "/^.*/{print \$1}")
-  local options=()
-  for lib in ${libs[@]}; do
-    options+=("-change '${lib}' '@executable_path/../Frameworks/$(basename ${lib})'")
-  done
-  eval "install_name_tool ${options[@]} $appPath"
-}
+if is_macos; then
+  function getQtBaseBinPathFromNixStore() {
+    local qtFullDerivationPath=$(nix show-derivation -f $STATUSREACTPATH/default.nix | jq -r '.[] | .inputDrvs | 'keys' | .[]' | grep qt-full)
+    local qtBaseDerivationPath=$(nix show-derivation $qtFullDerivationPath | jq -r '.[] | .inputDrvs | 'keys' | .[]' | grep qtbase)
+
+    echo $(nix show-derivation $qtBaseDerivationPath | jq -r '.[] | .outputs.bin.path')
+  }
+
+  function copyVersionedQtLibToPackage() {
+    local qtbaseBinPath="$1"
+    local fileName="$2"
+    local targetPath="$3"
+
+    mkdir -p $targetPath
+    local srcPath=$(find $qtbaseBinPath/lib -name $fileName)
+    echo "Copying $srcPath to $targetPath"
+    cp -f "$srcPath" "$targetPath/$fileName"
+    chmod +w "$targetPath/$fileName"
+  }
+fi
 
 function bundleMacOS() {
   # download prepared package with mac bundle files (it contains qt libraries, icon)
@@ -381,19 +392,25 @@ function bundleMacOS() {
     echo -e "${GREEN}Downloading done.${NC}"
     echo ""
     unzip ./Status.app.zip
-    cp -r assets/share/assets Status.app/Contents/Resources
-    ln -sf ../Resources/assets ../Resources/ubuntu-server ../Resources/node_modules Status.app/Contents/MacOS
-    chmod +x Status.app/Contents/Resources/ubuntu-server
-    cp ../desktop/bin/Status Status.app/Contents/MacOS/Status
-    cp ../desktop/bin/reportApp Status.app/Contents/MacOS
-    cp ../.env Status.app/Contents/Resources
-    ln -sf ../Resources/.env Status.app/Contents/MacOS/.env
-    cp -f ../deployment/macos/qt-reportApp.conf Status.app/Contents/Resources
-    ln -sf ../Resources/qt-reportApp.conf Status.app/Contents/MacOS/qt.conf
-    fixupNixQtLibrariesInApp 'Status.app/Contents/MacOS/reportApp'
-    fixupNixQtLibrariesInApp 'Status.app/Contents/MacOS/Status'
-    cp -f ../deployment/macos/Info.plist Status.app/Contents
-    cp -f ../deployment/macos/status-icon.icns Status.app/Contents/Resources
+    local contentsPath='Status.app/Contents'
+    cp -r assets/share/assets $contentsPath/Resources
+    ln -sf ../Resources/assets ../Resources/ubuntu-server ../Resources/node_modules $contentsPath/MacOS
+    chmod +x $contentsPath/Resources/ubuntu-server
+    cp ../desktop/bin/Status $contentsPath/MacOS/Status
+    cp ../desktop/bin/reportApp $contentsPath/MacOS
+    cp ../.env $contentsPath/Resources
+    ln -sf ../Resources/.env $contentsPath/MacOS/.env
+    cp -f ../deployment/macos/qt-reportApp.conf $contentsPath/Resources
+    ln -sf ../Resources/qt-reportApp.conf $contentsPath/MacOS/qt.conf
+    cp -f ../deployment/macos/Info.plist $contentsPath
+    cp -f ../deployment/macos/status-icon.icns $contentsPath/Resources
+
+    # Since in the Nix qt.full package the different Qt modules are spread across several directories,
+    # macdeployqt cannot find some qtbase plugins, so we copy them in its place
+    local qtbaseBinPath=$(getQtBaseBinPathFromNixStore)
+    copyVersionedQtLibToPackage $qtbaseBinPath libqcocoa.dylib "$contentsPath/PlugIns/platforms/"
+    copyVersionedQtLibToPackage $qtbaseBinPath libcocoaprintersupport.dylib "$contentsPath/PlugIns/printsupport/"
+
     $DEPLOYQT Status.app \
       -verbose=$VERBOSE_LEVEL \
       -qmldir="$(joinExistingPath "$STATUSREACTPATH" 'node_modules/react-native')" \
